@@ -25,7 +25,7 @@ version = '0.0.1'
 
 bootJar {
 	archiveBaseName = 'product-management-service'
-	version = '1.0.0'
+	version = '1.1.0'
 }
 
 java {
