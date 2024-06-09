@@ -1,9 +1,6 @@
 package com.myorg;
 
-import software.amazon.awscdk.Duration;
-import software.amazon.awscdk.RemovalPolicy;
-import software.amazon.awscdk.Stack;
-import software.amazon.awscdk.StackProps;
+import software.amazon.awscdk.*;
 import software.amazon.awscdk.services.applicationautoscaling.EnableScalingProps;
 import software.amazon.awscdk.services.ecs.*;
 import software.amazon.awscdk.services.ecs.patterns.ApplicationLoadBalancedFargateService;
@@ -12,13 +9,17 @@ import software.amazon.awscdk.services.elasticloadbalancingv2.HealthCheck;
 import software.amazon.awscdk.services.logs.LogGroup;
 import software.constructs.Construct;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class ServiceStack extends Stack {
-  public ServiceStack(final Construct scope, final String id, Cluster cluster) {
-    this(scope, id, null, cluster);
+
+  public ServiceStack(final Construct scope, final String id, Cluster cluster, RDSStack rdsStack) {
+    this(scope, id, null, cluster, rdsStack);
   }
 
   public ServiceStack(
-      final Construct scope, final String id, final StackProps props, Cluster cluster) {
+      final Construct scope, final String id, final StackProps props, Cluster cluster, RDSStack rdsStack) {
     super(scope, id, props);
 
     ApplicationLoadBalancedFargateService service =
@@ -34,7 +35,7 @@ public class ServiceStack extends Stack {
                     .containerName("aws-product-management")
                     .image(
                         ContainerImage.fromRegistry(
-                            "gabrielddantas/product-management-service:1.1.0"))
+                            "gabrielddantas/product-management-service:1.2.0"))
                     .containerPort(8080)
                     .logDriver(
                         LogDriver.awsLogs(
@@ -46,6 +47,8 @@ public class ServiceStack extends Stack {
                                         .build())
                                 .streamPrefix("product-management")
                                 .build()))
+                    // Env variables
+                    .environment(createEnvVariables(rdsStack.getUsername()))
                     .build())
             .publicLoadBalancer(true)
             .build();
@@ -71,5 +74,18 @@ public class ServiceStack extends Stack {
             .scaleInCooldown(Duration.seconds(60))
             .scaleOutCooldown(Duration.seconds(60))
             .build());
+  }
+
+  private String concatDataSourceUrl(String rdsEndpoint) {
+    return "jdbc:postgresql://" + rdsEndpoint + ":5432/db_aws_product_management";
+  }
+
+  private Map<String, String> createEnvVariables(String username) {
+    Map<String, String> envVars = new HashMap<>();
+    envVars.put("SPRING_DATASOURCE_URL", concatDataSourceUrl(Fn.importValue("RDS-endpoint")));
+    envVars.put("SPRING_DATASOURCE_USERNAME", username);
+    envVars.put("SPRING_DATASOURCE_PASSWORD", Fn.importValue("RDS-password"));
+
+    return envVars;
   }
 }
