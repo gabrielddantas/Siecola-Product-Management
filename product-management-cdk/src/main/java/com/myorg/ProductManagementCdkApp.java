@@ -19,10 +19,18 @@ public class ProductManagementCdkApp {
     RDSStack rdsStack = new RDSStack(app, "RDS-product-management", vpcStack.getVpc());
     rdsStack.addDependency(vpcStack);
 
+    SnsStack snsStack = new SnsStack(app, "SNS-product-management");
+
     ServiceStack serviceStack =
-        new ServiceStack(app, "ALB-product-management", clusterStack.getCluster(), rdsStack);
+        new ServiceStack(
+            app,
+            "ALB-product-management",
+            clusterStack.getCluster(),
+            rdsStack,
+            snsStack.getProductEventsTopic());
     serviceStack.addDependency(clusterStack);
     serviceStack.addDependency(rdsStack);
+    serviceStack.addDependency(snsStack);
 
     app.synth();
   }

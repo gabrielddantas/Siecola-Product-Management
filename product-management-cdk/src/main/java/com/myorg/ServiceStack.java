@@ -6,6 +6,7 @@ import software.amazon.awscdk.services.ecs.*;
 import software.amazon.awscdk.services.ecs.patterns.ApplicationLoadBalancedFargateService;
 import software.amazon.awscdk.services.ecs.patterns.ApplicationLoadBalancedTaskImageOptions;
 import software.amazon.awscdk.services.elasticloadbalancingv2.HealthCheck;
+import software.amazon.awscdk.services.events.targets.SnsTopic;
 import software.amazon.awscdk.services.logs.LogGroup;
 import software.constructs.Construct;
 
@@ -14,12 +15,22 @@ import java.util.Map;
 
 public class ServiceStack extends Stack {
 
-  public ServiceStack(final Construct scope, final String id, Cluster cluster, RDSStack rdsStack) {
-    this(scope, id, null, cluster, rdsStack);
+  public ServiceStack(
+      final Construct scope,
+      final String id,
+      Cluster cluster,
+      RDSStack rdsStack,
+      SnsTopic productEvents) {
+    this(scope, id, null, cluster, rdsStack, productEvents);
   }
 
   public ServiceStack(
-      final Construct scope, final String id, final StackProps props, Cluster cluster, RDSStack rdsStack) {
+      final Construct scope,
+      final String id,
+      final StackProps props,
+      Cluster cluster,
+      RDSStack rdsStack,
+      SnsTopic productEvents) {
     super(scope, id, props);
 
     ApplicationLoadBalancedFargateService service =
@@ -48,7 +59,9 @@ public class ServiceStack extends Stack {
                                 .streamPrefix("product-management")
                                 .build()))
                     // Env variables
-                    .environment(createEnvVariables(rdsStack.getUsername()))
+                    .environment(
+                        createEnvVariables(
+                            rdsStack.getUsername(), productEvents.getTopic().getTopicArn()))
                     .build())
             .publicLoadBalancer(true)
             .build();
@@ -74,17 +87,21 @@ public class ServiceStack extends Stack {
             .scaleInCooldown(Duration.seconds(60))
             .scaleOutCooldown(Duration.seconds(60))
             .build());
+
+    productEvents.getTopic().grantPublish(service.getTaskDefinition().getTaskRole());
   }
 
   private String concatDataSourceUrl(String rdsEndpoint) {
     return "jdbc:postgresql://" + rdsEndpoint + ":5432/db_aws_product_management";
   }
 
-  private Map<String, String> createEnvVariables(String username) {
+  private Map<String, String> createEnvVariables(String username, String topic) {
     Map<String, String> envVars = new HashMap<>();
     envVars.put("SPRING_DATASOURCE_URL", concatDataSourceUrl(Fn.importValue("RDS-endpoint")));
     envVars.put("SPRING_DATASOURCE_USERNAME", username);
     envVars.put("SPRING_DATASOURCE_PASSWORD", Fn.importValue("RDS-password"));
+    envVars.put("AWS_REGION", "sa-east-1");
+    envVars.put("AWS_SNS_TOPIC_PRODUCT_EVENTS_ARN", topic);
 
     return envVars;
   }
