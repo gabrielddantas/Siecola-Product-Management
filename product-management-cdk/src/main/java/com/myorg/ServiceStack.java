@@ -46,7 +46,7 @@ public class ServiceStack extends Stack {
                     .containerName("aws-product-management")
                     .image(
                         ContainerImage.fromRegistry(
-                            "gabrielddantas/product-management-service:1.2.0"))
+                            "gabrielddantas/product-management-service:1.3.0"))
                     .containerPort(8080)
                     .logDriver(
                         LogDriver.awsLogs(
